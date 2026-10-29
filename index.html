@@ -774,16 +774,34 @@ function prepare(){
   if(!window.jspdf){pdfMsg('O gerador de PDF não carregou. Verifique a internet e abra o arquivo de novo.',true);return null;}
   try{return buildPdf();}catch(e){pdfMsg('Algo deu errado ao montar o PDF ('+((e&&e.message)||e)+'). Tente com menos fotos.',true);return null;}
 }
-const pb=$('#printBtn'); let lastUrl='';
-function schedulePrep(){}
-// um toque: monta o PDF na hora e o próprio link baixa o arquivo
+const pb=$('#printBtn');
+let ready=null, readyKey='', readyUrl='', prepTimer=0;
+function stateKey(){return JSON.stringify([settings.gap,settings.margin,items.map(it=>[it.id,keyOf(it),it.qty])]);}
+function prepNow(){
+  const r=prepare(); if(!r) return false;
+  ready=r; readyKey=stateKey();
+  if(readyUrl) URL.revokeObjectURL(readyUrl);
+  readyUrl=URL.createObjectURL(r.file);
+  pb.href=readyUrl; pb.setAttribute('download',r.file.name);
+  return true;
+}
+// deixa o PDF pronto ANTES do toque: assim um toque só já baixa o arquivo
+function schedulePrep(){
+  clearTimeout(prepTimer);
+  prepTimer=setTimeout(()=>{
+    if(!items.length||!window.jspdf||!layout||!layout.count) return;
+    if(ready&&readyKey===stateKey()) return;
+    try{prepNow();}catch(e){}
+  },300);
+}
 pb.addEventListener('click',e=>{
-  const r=prepare();
-  if(!r){e.preventDefault();return;}
-  if(lastUrl) URL.revokeObjectURL(lastUrl);
-  lastUrl=URL.createObjectURL(r.file);
-  pb.href=lastUrl; pb.setAttribute('download',r.file.name);
-  pdfMsg('Baixando o PDF. Toque em "Abrir" na notificação de download e escolha o Epson iPrint para imprimir.');
+  if(ready&&readyKey===stateKey()&&readyUrl){
+    pdfMsg('Baixando o PDF. Toque em "Abrir" na notificação de download e escolha o Epson iPrint para imprimir.');
+    return; // o próprio link baixa o arquivo
+  }
+  e.preventDefault();
+  pdfMsg('Preparando a folha…');
+  setTimeout(()=>{ if(prepNow()) pdfMsg('Folha pronta. Toque em Imprimir.'); },30);
 });
 
 runLayout(); refresh();
