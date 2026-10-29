@@ -248,10 +248,10 @@ a.btn.primary{color:var(--accent-ink)}
         <details class="tips" open>
           <summary>Como imprimir</summary>
           <ol>
-            <li>Toque em <b>Imprimir</b>.</li>
-            <li>Se abrir uma lista de aplicativos, escolha <b>Epson iPrint</b>.</li>
-            <li>Se aparecer "PDF baixado", toque na notificação de download (ou abra Meus Arquivos → Downloads), abra o PDF, toque em compartilhar e escolha <b>Epson iPrint</b>.</li>
+            <li>Toque em <b>Imprimir</b>. O PDF é baixado.</li>
+            <li>Na notificação de download, toque em <b>Abrir</b> e escolha <b>Epson iPrint</b>.</li>
             <li>No iPrint: papel <b>A4</b> e layout <b>Com margens</b>. Não use "Sem margens", porque aumenta as fotos.</li>
+            <li>Depois de imprimir, apague o PDF em <b>Meus Arquivos → Downloads</b> para liberar espaço.</li>
           </ol>
         </details>
       </div>
@@ -361,7 +361,7 @@ function printURL(it,turned){
   const c=document.createElement('canvas');c.width=ow;c.height=oh;drawTo(c.getContext('2d'),it,ow,oh);
   let out=c;
   if(turned){const c2=document.createElement('canvas');c2.width=oh;c2.height=ow;const x=c2.getContext('2d');x.translate(oh,0);x.rotate(Math.PI/2);x.drawImage(c,0,0);out=c2;}
-  return it.pc[kk]=out.toDataURL('image/jpeg',0.92);
+  return it.pc[kk]=out.toDataURL('image/jpeg',0.85);
 }
 function effDpi(it){
   const {W,H}=rdims(it);
@@ -765,7 +765,7 @@ function buildPdf(){
     }
   });
   const d=new Date(), pad=n=>String(n).padStart(2,'0');
-  const name=`imagens-A4-${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}h${pad(d.getMinutes())}.pdf`;
+  const name=`imagens-A4-${pad(d.getDate())}-${pad(d.getMonth()+1)}-${pad(d.getHours())}h${pad(d.getMinutes())}.pdf`;
   return {pdf,name,file:new File([pdf.output('blob')],name,{type:'application/pdf'})};
 }
 function prepare(){
@@ -774,47 +774,16 @@ function prepare(){
   if(!window.jspdf){pdfMsg('O gerador de PDF não carregou. Verifique a internet e abra o arquivo de novo.',true);return null;}
   try{return buildPdf();}catch(e){pdfMsg('Algo deu errado ao montar o PDF ('+((e&&e.message)||e)+'). Tente com menos fotos.',true);return null;}
 }
-let ready=null, readyKey='', readyUrl='', prepTimer=0, forceDownload=false;
-const pb=$('#printBtn');
-function stateKey(){return JSON.stringify([settings.gap,settings.margin,items.map(it=>[it.id,keyOf(it),it.qty])]);}
-function prepNow(){
-  const r=prepare(); if(!r) return false;
-  ready=r; readyKey=stateKey();
-  if(readyUrl) URL.revokeObjectURL(readyUrl);
-  readyUrl=URL.createObjectURL(r.file);
-  pb.href=readyUrl; pb.setAttribute('download',r.file.name);
-  return true;
-}
-// monta o PDF com antecedência: o toque em Imprimir já encontra o arquivo pronto
-function schedulePrep(){
-  clearTimeout(prepTimer);
-  prepTimer=setTimeout(()=>{
-    if(!items.length||!window.jspdf||!layout||!layout.count) return;
-    if(ready&&readyKey===stateKey()) return;
-    try{prepNow();}catch(e){}
-  },700);
-}
-const dlHelp='Se o PDF baixou, toque na notificação de download (ou abra Meus Arquivos → Downloads), abra o PDF, toque em compartilhar e escolha Epson iPrint.';
+const pb=$('#printBtn'); let lastUrl='';
+function schedulePrep(){}
+// um toque: monta o PDF na hora e o próprio link baixa o arquivo
 pb.addEventListener('click',e=>{
-  if(!(ready&&readyKey===stateKey()&&readyUrl)){
-    e.preventDefault();
-    pdfMsg('Preparando a folha…');
-    setTimeout(()=>{ if(prepNow()) pdfMsg('Folha pronta. Toque em Imprimir de novo.'); },30);
-    return;
-  }
-  const f=ready.file;
-  let canShare=false;
-  try{canShare=!forceDownload&&!!(navigator.share&&navigator.canShare&&navigator.canShare({files:[f]}));}catch(err){}
-  if(!canShare){ forceDownload=false; pdfMsg('Baixando o PDF… '+dlHelp); return; } // deixa o próprio link baixar o arquivo
-  e.preventDefault();
-  pdfMsg('Escolha Epson iPrint na lista.');
-  navigator.share({files:[f],title:'Ajustador de Imagens'}).then(()=>{
-    pdfMsg('Enviado. Agora é só imprimir no Epson iPrint (papel A4, com margens).');
-  }).catch(err=>{
-    if(err&&err.name==='AbortError'){pdfMsg('');return;}
-    forceDownload=true;
-    pdfMsg('Não consegui abrir a lista de aplicativos. Toque em Imprimir de novo para baixar o PDF.');
-  });
+  const r=prepare();
+  if(!r){e.preventDefault();return;}
+  if(lastUrl) URL.revokeObjectURL(lastUrl);
+  lastUrl=URL.createObjectURL(r.file);
+  pb.href=lastUrl; pb.setAttribute('download',r.file.name);
+  pdfMsg('Baixando o PDF. Toque em "Abrir" na notificação de download e escolha o Epson iPrint para imprimir.');
 });
 
 runLayout(); refresh();
