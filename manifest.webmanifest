@@ -5,7 +5,7 @@
   "lang": "pt-BR",
   "start_url": "./",
   "scope": "./",
-  "display": "standalone",
+  "display": "browser",
   "orientation": "portrait",
   "background_color": "#2b5a4b",
   "theme_color": "#2b5a4b",
